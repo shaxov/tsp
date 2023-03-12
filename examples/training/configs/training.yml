@@ -1,0 +1,38 @@
+lit_module:
+  name: conv_net
+  path: configs/modules/conv_net.yml
+
+  optimizer:
+    lr: 0.001
+
+  scheduler:
+    factor: 0.5
+    patience: 10
+    min_lr: 0.00001
+
+trainer:
+  accelerator: cpu
+  devices: [0]
+  max_epochs: -1
+
+  logger:
+    path: ./logs
+
+  checkpointer:
+    path: ./checkpoints
+    save_top_k: 1
+    verbose: True
+    monitor: val_loss
+    mode: min
+    save_last: True
+
+  progress_bar:
+    refresh_rate: 1
+
+loaders:
+  seed: 42
+  test_size: 0.1
+  batch_size: 4
+  num_workers: 0
+  num_sanity_val_steps: 1
+  check_val_every_n_epoch: 1
