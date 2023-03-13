@@ -42,7 +42,6 @@ class ConvNet(nn.Module):
             e = torch.cat([e, self.knns_linear(edge_knn)], dim=-1)
 
         for node_conv, edge_linr in zip(self.node_convs, self.edge_linrs[:-1]):
-            x = node_conv(x, e, edge_index)
-            e = edge_linr(x, e, edge_index)
+            x, e = node_conv(x, e, edge_index), edge_linr(x, e, edge_index)
         e = self.edge_linrs[-1](x, e, edge_index)
         return self.mlp(e)
