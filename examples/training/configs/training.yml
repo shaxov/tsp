@@ -1,5 +1,5 @@
 lit_module:
-  name: conv_net
+  name: conv2_net
   path: configs/modules/conv_net.yml
 
   optimizer:
@@ -7,20 +7,20 @@ lit_module:
 
   scheduler:
     factor: 0.5
-    patience: 10
+    patience: 15
     min_lr: 0.00001
 
 trainer:
-  accelerator: cpu
-  devices: [0]
+  accelerator: gpu
+  devices: [0, 1, 2, 3]
   max_epochs: -1
 
   logger:
-    path: ./logs
+    path: /scratch/algo/shpakovych/tsp/logs
 
   checkpointer:
-    path: ./checkpoints
-    save_top_k: 1
+    path: /scratch/algo/shpakovych/tsp/checkpoints
+    save_top_k: 5
     verbose: True
     monitor: val_loss
     mode: min
@@ -31,8 +31,8 @@ trainer:
 
 loaders:
   seed: 42
-  test_size: 0.1
-  batch_size: 4
-  num_workers: 0
+  test_size: 0.05
+  batch_size: 16
+  num_workers: 4
   num_sanity_val_steps: 1
   check_val_every_n_epoch: 1

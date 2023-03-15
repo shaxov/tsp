@@ -3,16 +3,19 @@ import tsp
 
 
 def main():
-    knn = [5, 10]
+    knn = [2, 5, 7, 10, 15]
     dataset = tsp.dataset.TSPDataset(
+        root="/scratch/algo/shpakovych/tsp/dataset",
         transforms=tsp.dataset.transforms.Compose([
-            tsp.dataset.transforms.MaxNodesTransform(100),
+            tsp.dataset.transforms.MaxNodesTransform(1000),
             tsp.dataset.transforms.KNNTransform(knn),
         ]),
     )
-    device = "cuda" # or "cpu"
+    print(dataset)
+    print(dataset[0])
+    # device = "cuda" # or "cpu"
     path_to_training_config = "configs/training.yml"
-    model_folder_name = "conv_net"
+    model_folder_name = "conv2_net"
 
     # Model initialization
     model = tsp.utils.make_model(
@@ -29,7 +32,8 @@ def main():
 
 
 if __name__ == "__main__":
-    WORKDIR = "/Users/shpakovych/repos/tsp/examples/training"
+    # WORKDIR = "/Users/shpakovych/repos/tsp/examples/training"
+    WORKDIR = "/home/algo/shpakovych/repos/tsp/examples/training"
 
     is_set_workdir = True
     if is_set_workdir:
