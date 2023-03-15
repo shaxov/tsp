@@ -1,4 +1,5 @@
 import torch
+from tqdm import tqdm
 import torch_cluster as pyc
 from typing import Union, List
 from torchvision.transforms import Compose
@@ -37,9 +38,11 @@ class KNNTransform:
 
     def __call__(self, data):
         split = KNNTransform._edge_index_split
-        for entry in data:
+        for entry in tqdm(data, desc="KNNTransform", unit="graph"):
             knn_label_list = []
             entry_split = split(entry.edge_index)
+            if len(entry.edge_attr.shape) == 1:
+                entry.edge_attr = entry.edge_attr.view(-1, 1)
             for k in self.k:
                 knn_split = split(pyc.knn(entry.pos, entry.pos, k + 1))
                 knn_label = torch.cat([
@@ -47,7 +50,8 @@ class KNNTransform:
                     dim=0,
                 ).unsqueeze(-1).float()
                 knn_label_list.append(knn_label)
-            entry.knn_label = torch.cat(knn_label_list, dim=-1)
+            knn_attr = torch.cat(knn_label_list, dim=-1)
+            entry.edge_attr = torch.cat([entry.edge_attr, knn_attr], dim=-1)
         return data
 
 

@@ -71,7 +71,7 @@ def make_train_val_loaders(path_to_training_config, dataset):
 
 def make_model(
         path_to_training_config,
-        knn_dim, 
+        knn_dim=None, 
         model_name=""):
     # Training config loading
     with open(path_to_training_config, "r") as f:
@@ -115,6 +115,7 @@ def make_trainer(path_to_training_config, name, return_chkp_clbk=False):
     trainer_args = dict(
         accelerator=trainer_config["accelerator"],
         max_epochs=trainer_config["max_epochs"],
+        gradient_clip_val=1.,
         logger=logger,
         callbacks=[
             checkpoint_callback,

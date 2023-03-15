@@ -1,71 +1,96 @@
 import torch
-import torch.nn as nn
+from . import typedef
+from typing import Union, Tuple
+from torch.nn import Module, Linear, BatchNorm1d
 from torch_geometric.nn import MessagePassing
 
-from . import typedef
 
-
-class EdgeSum(MessagePassing):
+class EdgeAttention(MessagePassing):
     
-    def __init__(self):
-        super().__init__(flow="target_to_source", aggr="sum")
-        
-    def forward(self, e, edge_index):
-        p = self.propagate(edge_index, e=e)
-        return p[edge_index[0]]
-    
-    def message(self, e):
-        return e
-
-
-class NodeConv(MessagePassing):
-    
-    def __init__(self, units, eps=typedef.EPS):
-        super().__init__(flow="target_to_source", aggr="sum")
-        self.w_1 = nn.Linear(units, units, bias=False)
-        self.w_2 = nn.Linear(units, units, bias=False)
-        self.edge_sum = EdgeSum()
+    def __init__(self, eps=typedef.EPS):
+        super().__init__(aggr="add")
         self.eps = eps
-    
-    def forward(self, x, e, edge_index):
-        e = e.sigmoid()
-        e_sum = self.edge_sum(e, edge_index) + self.eps
-        eta = e / e_sum
-        return self.propagate(edge_index, x=x, eta=eta)
-    
-    def message(self, x_i, x_j, eta):        
-        return self.w_1(x_i) + eta * self.w_2(x_j)
+        
+    def forward(self, edge_attr, edge_index):
+        edge_attr = torch.sigmoid(edge_attr)
+        prop_attr = self.propagate(edge_index, edge_attr=edge_attr)
+        prop_attr = prop_attr[edge_index[1]] + self.eps
+        return edge_attr / prop_attr
+       
+    def message(self, edge_attr):
+        return edge_attr
     
 
-class NodeConvRes(nn.Module):
+class GEAConv(MessagePassing):
+
+    """ Graph Edge Attention Convolution. """
+
+    def __init__(self, in_channels, out_channels, eps=typedef.EPS):
+       super().__init__(aggr="add")
+       self.lin = Linear(in_channels, out_channels, bias=False)
+       self.edge_atten = EdgeAttention(eps=eps)
+
+    def forward(self, x, edge_attr, edge_index):
+        edge_atten = self.edge_atten(edge_attr, edge_index)
+        return self.propagate(edge_index, x=x, edge_atten=edge_atten)
+
+    def message(self, x_j, edge_atten):        
+        return edge_atten * self.lin(x_j)
     
-    def __init__(self, units, eps=typedef.EPS):
+
+class GEA2Conv(GEAConv):
+
+    def __init__(self, in_channels, out_channels, eps=typedef.EPS):
+       super().__init__(in_channels, out_channels, eps)
+       self.lin = Linear(in_channels * 2, out_channels, bias=False)
+
+    def message(self, x_i, x_j, edge_atten):        
+        return edge_atten * self.lin(torch.cat([x_i, x_j - x_i], dim=-1))
+    
+
+class ResNodeConv(Module):
+
+    def __init__(self,
+                 in_channels: int, 
+                 out_channels: int):
         super().__init__()
-        self.node_conv = NodeConv(units, eps)
-        self.bn = nn.BatchNorm1d(units)
-        
-    def forward(self, x, e, edge_index):
-        h = self.node_conv(x, e, edge_index)
-        h = self.bn(h).relu()
+        self.gea_conv = GEAConv(in_channels, out_channels)
+        self.lin = Linear(in_channels, out_channels, bias=False)
+        self.bn = BatchNorm1d(out_channels)
+    
+    def forward(self, x, edge_attr, edge_index):
+        h = self.lin(x) + self.gea_conv(x, edge_attr, edge_index)
+        h = torch.relu(self.bn(h))
         return x + h
     
 
-class EdgeLinrRes(MessagePassing):
+class ResNode2Conv(ResNodeConv):
+
+    def __init__(self,
+                 in_channels: int, 
+                 out_channels: int):
+        super().__init__(in_channels, out_channels)
+        self.gea_conv = GEA2Conv(in_channels, out_channels)
     
-    def __init__(self, units):
-        super().__init__(flow="target_to_source")
-        self.w_3 = nn.Linear(units, units, bias=False)
-        self.w_4 = nn.Linear(units, units, bias=False)
-        self.w_5 = nn.Linear(units, units, bias=False)
-        self.bn = nn.BatchNorm1d(units)
+
+class ResEdgeLinear(MessagePassing):
+    
+    def __init__(self, 
+                 in_features: int, 
+                 out_features: int):
+        super().__init__()
+        self.lin1 = Linear(in_features, out_features, bias=False)
+        self.lin2 = Linear(in_features, out_features, bias=False)
+        self.lin3 = Linear(in_features, out_features, bias=False)
+        self.bn = BatchNorm1d(out_features)
         
-    def forward(self, x, e, edge_index):
-        return self.propagate(edge_index, x=x, e=e)
+    def forward(self, x, edge_attr, edge_index):
+        return self.propagate(edge_index, x=x, edge_attr=edge_attr)
     
-    def message(self, x_i, x_j, e):        
-        h = self.w_3(e) + self.w_4(x_i) + self.w_5(x_j)
-        h = self.bn(h).relu()
-        return e + h
+    def message(self, x_i, x_j, edge_attr):        
+        h = self.lin1(edge_attr) + self.lin2(x_i) + self.lin3(x_j)
+        h = torch.relu(self.bn(h))
+        return edge_attr + h
     
     def aggregate(self, inputs, index, ptr=None, dim_size=None):
         return inputs
