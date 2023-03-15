@@ -4,4 +4,5 @@ This repository contains code for the paper ["An Efficient Graph Convolutional N
 
 The original code is rewritten using the [PyG](https://pytorch-geometric.readthedocs.io/en/latest/index.html) library.
 
-![alt text](https://gitlab.com/shaxov/tsp/-/blob/main/images/improvement_example.png)
+
+![alt text for screen readers](images/improvement_example.png "Improvement example")
